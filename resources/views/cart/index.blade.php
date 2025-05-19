@@ -41,7 +41,11 @@
                                             {{ $item->product->name }}
                                         </a>
                                     </h3>
-                                    <p class="ml-4 text-base font-medium text-gray-900">Rp {{ number_format($item->product->getActualPrice() * $item->quantity, 0, ',', '.') }}</p>
+                                    <p class="ml-4 text-base font-medium text-gray-900 item-subtotal" 
+                                       data-price="{{ $item->product->getActualPrice() }}" 
+                                       data-item-id="{{ $item->id }}">
+                                       Rp {{ number_format($item->product->getActualPrice() * $item->quantity, 0, ',', '.') }}
+                                    </p>
                                 </div>
                                 
                                 <div class="mt-1 text-sm text-gray-500">
@@ -100,19 +104,27 @@
                                         <tbody>
                                             <tr class="border-t border-gray-200">
                                                 <th scope="row" class="px-4 py-2 text-left text-sm font-normal text-gray-500">Subtotal</th>
-                                                <td class="px-4 py-2 text-right text-sm text-gray-900">Rp {{ number_format($subtotal, 0, ',', '.') }}</td>
+                                                <td class="px-4 py-2 text-right text-sm text-gray-900" id="cart-subtotal">
+                                                    Rp {{ number_format($subtotal, 0, ',', '.') }}
+                                                </td>
                                             </tr>
                                             <tr class="border-t border-gray-200">
                                                 <th scope="row" class="px-4 py-2 text-left text-sm font-normal text-gray-500">Shipping (estimated)</th>
-                                                <td class="px-4 py-2 text-right text-sm text-gray-900">Rp {{ number_format(15000, 0, ',', '.') }}</td>
+                                                <td class="px-4 py-2 text-right text-sm text-gray-900" id="cart-shipping">
+                                                    Rp {{ number_format(15000, 0, ',', '.') }}
+                                                </td>
                                             </tr>
                                             <tr class="border-t border-gray-200">
                                                 <th scope="row" class="px-4 py-2 text-left text-sm font-normal text-gray-500">Tax (estimated)</th>
-                                                <td class="px-4 py-2 text-right text-sm text-gray-900">Rp {{ number_format($subtotal * 0.1, 0, ',', '.') }}</td>
+                                                <td class="px-4 py-2 text-right text-sm text-gray-900" id="cart-tax">
+                                                    Rp {{ number_format($subtotal * 0.1, 0, ',', '.') }}
+                                                </td>
                                             </tr>
                                             <tr class="border-t border-gray-200">
                                                 <th scope="row" class="px-4 py-2 text-left text-sm font-semibold text-gray-900">Order Total</th>
-                                                <td class="px-4 py-2 text-right text-sm font-semibold text-gray-900">Rp {{ number_format($subtotal + 15000 + ($subtotal * 0.1), 0, ',', '.') }}</td>
+                                                <td class="px-4 py-2 text-right text-sm font-semibold text-gray-900" id="cart-total">
+                                                    Rp {{ number_format($subtotal + 15000 + ($subtotal * 0.1), 0, ',', '.') }}
+                                                </td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -164,6 +176,50 @@
 @if(!$cartItems->isEmpty())
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Store constant shipping price
+        const shippingCost = 15000;
+        const taxRate = 0.1; // 10% tax rate
+        
+        // Format money value
+        function formatMoney(amount) {
+            return new Intl.NumberFormat('id-ID', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(amount);
+        }
+        
+        // Update item subtotal
+        function updateItemSubtotal(itemId, quantity) {
+            const subtotalElement = document.querySelector(`.item-subtotal[data-item-id="${itemId}"]`);
+            const unitPrice = parseFloat(subtotalElement.getAttribute('data-price'));
+            const subtotal = unitPrice * quantity;
+            subtotalElement.textContent = 'Rp ' + formatMoney(subtotal);
+            return subtotal;
+        }
+        
+        // Recalculate all cart totals
+        function recalculateCart() {
+            const quantityInputs = document.querySelectorAll('.quantity-input');
+            let subtotal = 0;
+            
+            // Calculate subtotal from all items
+            quantityInputs.forEach(input => {
+                const itemId = input.getAttribute('data-item-id');
+                const quantity = parseInt(input.value);
+                const itemSubtotal = updateItemSubtotal(itemId, quantity);
+                subtotal += itemSubtotal;
+            });
+            
+            // Calculate tax and total
+            const tax = subtotal * taxRate;
+            const total = subtotal + shippingCost + tax;
+            
+            // Update the display values
+            document.getElementById('cart-subtotal').textContent = 'Rp ' + formatMoney(subtotal);
+            document.getElementById('cart-tax').textContent = 'Rp ' + formatMoney(tax);
+            document.getElementById('cart-total').textContent = 'Rp ' + formatMoney(total);
+        }
+        
         // Quantity controls
         const decreaseBtns = document.querySelectorAll('.decrease-quantity');
         const increaseBtns = document.querySelectorAll('.increase-quantity');
@@ -175,6 +231,7 @@
                 const input = document.querySelector(`.quantity-input[data-item-id="${itemId}"]`);
                 if (parseInt(input.value) > 1) {
                     input.value = parseInt(input.value) - 1;
+                    recalculateCart();
                 }
             });
         });
@@ -184,6 +241,18 @@
                 const itemId = this.getAttribute('data-item-id');
                 const input = document.querySelector(`.quantity-input[data-item-id="${itemId}"]`);
                 input.value = parseInt(input.value) + 1;
+                recalculateCart();
+            });
+        });
+        
+        // Update on direct input change
+        quantityInputs.forEach(input => {
+            input.addEventListener('change', function() {
+                // Ensure minimum value is 1
+                if (parseInt(this.value) < 1) {
+                    this.value = 1;
+                }
+                recalculateCart();
             });
         });
         

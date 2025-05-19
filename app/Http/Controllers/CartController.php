@@ -36,7 +36,7 @@ class CartController extends Controller
             'product_id' => 'required|exists:products,id',
             'quantity' => 'required|integer|min:1',
             'product_variant_id' => 'nullable|exists:product_variants,id',
-            'product_size_id' => 'nullable|exists:product_sizes,id',
+            'product_size_id' => 'required_if:has_sizes,1|exists:product_sizes,id',
         ]);
         
         $product = Product::findOrFail($request->product_id);

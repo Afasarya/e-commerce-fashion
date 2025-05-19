@@ -110,6 +110,10 @@
                     @csrf
                     <input type="hidden" name="product_id" value="{{ $product->id }}">
                     
+                    @if($product->sizes->isNotEmpty())
+                        <input type="hidden" name="has_sizes" value="1">
+                    @endif
+                    
                     <!-- Variants -->
                     @if($product->variants->isNotEmpty())
                         <div class="mt-8">
@@ -157,10 +161,12 @@
                                             <input 
                                                 type="radio" 
                                                 name="product_size_id" 
-                                                value="{{ $size->id }}" 
-                                                class="sr-only" 
+                                                value="{{ $size->id }}"
+                                                class="sr-only size-radio"
                                                 {{ $size->isInStock() ? '' : 'disabled' }}
+                                                data-size-name="{{ $size->size }}"
                                                 aria-labelledby="size-{{ $size->id }}-label"
+                                                required
                                             >
                                             <span id="size-{{ $size->id }}-label">{{ $size->size }}</span>
                                             @if(!$size->isInStock())
@@ -174,6 +180,7 @@
                                     @endforeach
                                 </div>
                             </fieldset>
+                            <p class="mt-2 text-sm text-red-600 hidden" id="size-error">Please select a size</p>
                         </div>
                     @endif
                     
@@ -327,17 +334,61 @@
         });
         
         // Variant selection
-        const variantRadios = document.querySelectorAll('.variant-radio');
         const variantLabels = document.querySelectorAll('[data-variant-id]');
         
         variantLabels.forEach(label => {
             label.addEventListener('click', function() {
-                variantLabels.forEach(l => {
-                    l.classList.remove('ring', 'ring-offset-1');
-                });
-                this.classList.add('ring', 'ring-offset-1');
+                // Only allow clicking if there's an input child
+                const input = this.querySelector('input[type="radio"]');
+                if (input) {
+                    variantLabels.forEach(l => {
+                        l.classList.remove('ring', 'ring-offset-1');
+                    });
+                    this.classList.add('ring', 'ring-offset-1');
+                    input.checked = true;
+                }
             });
         });
+        
+        // Size selection
+        const sizeLabels = document.querySelectorAll('.size-radio');
+        
+        if (sizeLabels.length > 0) {
+            sizeLabels.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    // Remove selected class from all labels
+                    document.querySelectorAll('.size-radio').forEach(r => {
+                        r.closest('label').classList.remove('ring-2', 'ring-yellow-500');
+                    });
+                    
+                    // Add selected class to the checked radio's label
+                    if (this.checked) {
+                        this.closest('label').classList.add('ring-2', 'ring-yellow-500');
+                        
+                        // Hide error message if it was showing
+                        document.getElementById('size-error').classList.add('hidden');
+                    }
+                });
+            });
+        }
+        
+        // Form validation
+        const addToCartForm = document.querySelector('form[action="{{ route('cart.add') }}"]');
+        
+        if (addToCartForm) {
+            addToCartForm.addEventListener('submit', function(e) {
+                // If we have sizes and none are selected, show error and prevent submission
+                const sizesExist = document.querySelectorAll('.size-radio').length > 0;
+                const sizeSelected = document.querySelector('.size-radio:checked');
+                
+                if (sizesExist && !sizeSelected) {
+                    e.preventDefault();
+                    document.getElementById('size-error').classList.remove('hidden');
+                    // Scroll to the size section
+                    document.getElementById('size-error').scrollIntoView({behavior: 'smooth'});
+                }
+            });
+        }
     });
 </script>
 @endsection
